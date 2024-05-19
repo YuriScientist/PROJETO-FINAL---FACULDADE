@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 
-data = pd.read_excel(r'C:\Users\USER\Desktop\TCC\Dados-TCC.xlsx')  # colocar onde esta a planilha no seu computador
+data = pd.read_excel(r'Dados-TCC.xlsx')  # colocar onde esta a planilha no seu computador
 #Passo 2: Importando e Limpandando dados
  
 display(data)
