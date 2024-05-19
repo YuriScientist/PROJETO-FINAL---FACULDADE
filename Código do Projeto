@@ -1,0 +1,158 @@
+# Passo 1 : Importando bibliotecas
+
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+
+data = pd.read_excel(r'C:\Users\USER\Desktop\TCC\Dados-TCC.xlsx')  # colocar onde esta a planilha no seu computador
+#Passo 2: Importando e Limpandando dados
+ 
+display(data)
+data.info()
+# Verficando os números nulos da base
+data.isnull().sum()
+# Tratando valores vazios
+data[data.isnull().any(axis=1)]
+# Excluindo colunas que não tinham informações
+data = data.dropna()
+data.isnull().sum()
+
+### Análise dos terrenos
+
+# Passo 3: Análise e Pontuação dos Terrenos
+# Supondo que o preço do terreno seja o critério mais importante, vamos normalizá-lo e atribuir pesos aos outros critérios
+peso_preco_terreno = 0.5
+peso_log_pessoas = 0.2
+peso_log_veiculos = 0.2
+peso_tipo_solo = 0.1
+
+# Normalização do preço do terreno
+data['Preço do Terreno (Normalizado)'] = (data['Preço do Terreno (R$)'] - 
+                                          data['Preço do Terreno (R$)'].min()) / (
+                                         data['Preço do Terreno (R$)'].max() - 
+                                         data['Preço do Terreno (R$)'].min())
+
+# Cálculo da pontuação para cada terreno
+data['Pontuação'] = 0
+
+# Pontuação baseada no preço do terreno (considerando normalização)
+data['Pontuação'] += peso_preco_terreno * ((data['Preço do Terreno (R$)'] - data['Preço do Terreno (R$)'].min()) /
+                                           (data['Preço do Terreno (R$)'].max() - data['Preço do Terreno (R$)'].min()))
+
+# Pontuação extra se a logística de pessoas é alta
+data['Pontuação'] += peso_log_pessoas * data['Logística de Pessoas'].apply(lambda x: 1 if x == 'Alta' else 0)
+
+# Pontuação extra se a logística de veículos é alta
+data['Pontuação'] += peso_log_veiculos * data['Logística de Veículos'].apply(lambda x: 1 if x == 'Alta' else 0)
+
+# Pontuação extra se o tipo de solo é arenoso
+data['Pontuação'] += peso_tipo_solo * data['Tipo de Solo'].apply(lambda x: 1 if x == 'Arenoso' else 0)
+
+# Passo 4: Seleção do Melhor Terreno
+melhor_terreno = data.iloc[data['Pontuação'].idxmax()]
+# Ordenar os terrenos pela pontuação em ordem decrescente
+top_terrenos = data.sort_values(by='Pontuação', ascending=False)
+
+# Selecionar os top 3 terrenos
+top3_terrenos = top_terrenos.head(3)
+
+# Exibir os top 3 terrenos de forma mais legível
+print("Top 3 Terrenos:")
+for i, terreno in top3_terrenos.iterrows():
+    print(f"Terreno {i + 1}:")
+    print(f"Bairro: {terreno['Bairro']}")
+    print(f"Preço do Terreno (R$): {terreno['Preço do Terreno (R$)']}")
+    print(f"Preço do Metro Quadrado (R$/m²): {terreno['Preço do Metro Quadrado (R$/m²)']}")
+    print(f"CEP: {terreno['CEP']}")
+    print(f"De Frente para Praia: {'Sim' if terreno['De Frente para Praia'] else 'Não'}")
+    print(f"Logística de Pessoas: {terreno['Logística de Pessoas']}")
+    print(f"Logística de Veículos: {terreno['Logística de Veículos']}")
+    print(f"Tipo de Solo: {terreno['Tipo de Solo']}\n")
+# Exibir o top 1 terreno
+print("Top 1 Terreno:")
+print(melhor_terreno)
+
+# Passo 5: Modelagem de Valorização do Terreno
+# Definindo a taxa de valorização de 1 ano
+taxa_1_ano = 0.0142  # Taxa de valorização de 1,42% ao ano
+
+# Dados de preço do terreno ao longo do tempo
+anos = np.array([0, 1, 5, 10, 20]).reshape(-1, 1)  # Anos desde a compra
+preco_inicial = melhor_terreno['Preço do Terreno (R$)']
+preco_terreno = np.array([preco_inicial,
+                          preco_inicial * (1 + taxa_1_ano),  # Valorização de 1,42% ao ano
+                          preco_inicial * (1 + taxa_1_ano) ** 5,  # Valorização de 1,42% ao ano por 5 anos
+                          preco_inicial * (1 + taxa_1_ano) ** 10,  # Valorização de 1,42% ao ano por 10 anos
+                          preco_inicial * (1 + taxa_1_ano) ** 20]).reshape(-1, 1)  # Valorização de 1,42% ao ano por 20 anos
+
+# Calcular a porcentagem de valorização em relação ao valor inicial
+porcentagem_valorizacao = ((preco_terreno - preco_inicial) / preco_inicial) * 100
+
+# Criar e treinar o modelo de regressão linear
+modelo = LinearRegression()
+modelo.fit(anos, preco_terreno)
+
+# Previsão de preço do terreno para os próximos anos
+previsao_anos = np.array([1, 5, 10, 20]).reshape(-1, 1)
+previsao_valorizacao = modelo.predict(previsao_anos)
+
+# Exibir as previsões
+print("Previsão de Valorização do Terreno:")
+for ano, valor, porcentagem in zip([1, 5, 10, 20], previsao_valorizacao, porcentagem_valorizacao):
+    print(f"Em {ano} ano(s): R${valor[0]:,.2f} ({porcentagem[0]:.2f}% de valorização)")
+
+### GRÁFICOS ###
+# Passo 6: Plotando o gráfico
+plt.figure(figsize=(10, 6))
+plt.plot(anos, preco_terreno, marker='o', linestyle='-', color='b', label='Preço do Terreno')
+plt.title('Valorização do Terreno ao Longo do Tempo')
+plt.xlabel('Anos desde a Compra')
+plt.ylabel('Preço do Terreno (R$)')
+plt.xticks(np.arange(0, 21, step=1))  # Atualizado para incluir 20 anos
+plt.grid(True)
+plt.legend()
+plt.show()
+
+# Passo 6: Visualização dos Resultados
+# Gráfico de valorização do terreno ao longo do tempo
+plt.figure(figsize=(10, 6))
+plt.plot(anos, preco_terreno, 'o-', label='Preço do Terreno')
+plt.plot(previsao_anos, previsao_valorizacao, 'o--', label='Previsão de Valorização')
+plt.title('Valorização do Terreno ao Longo do Tempo')
+plt.xlabel('Anos desde a compra')
+plt.ylabel('Preço do Terreno (R$)')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Passo 7 Visualizando a localização
+
+from geopy.geocoders import Nominatim
+
+# Lista de CEPs para consultar
+ceps = ['22240-000', '22785-030', '22210-030']
+
+# Criar uma instância do geolocalizador Nominatim
+geolocator = Nominatim(user_agent="geolocalização")
+
+# Lista para armazenar as coordenadas
+coordenadas_top3 = []
+
+# Iterar sobre os CEPs e obter as coordenadas
+for cep in ceps:
+    # Consultar as coordenadas usando o CEP
+    location = geolocator.geocode(cep, addressdetails=True)
+    
+    # Verificar se a localização foi encontrada
+    if location:
+        # Obter as coordenadas (latitude e longitude)
+        latitude = location.latitude
+        longitude = location.longitude
+        
+        # Adicionar as coordenadas à lista
+        coordenadas_top3.append((latitude, longitude))
+
+# Exibir as coordenadas
+for i, (lat, lon) in enumerate(coordenadas_top3, start=1):
+    print(f"Terreno {i}: Latitude {lat}, Longitude {lon}")
