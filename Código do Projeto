@@ -18,6 +18,24 @@ data[data.isnull().any(axis=1)]
 data = data.dropna()
 data.isnull().sum()
 
+# Configurando o tamanho da figura
+plt.figure(figsize=(10, 12))
+
+# Plotando o histograma do preço dos terrenos
+plt.subplot(2, 1, 1)  # 2 linhas, 1 coluna, primeiro gráfico
+sns.histplot(data['Preço do Terreno (R$)'], bins=20, color='blue', kde=False)  # Removendo a linha KDE
+plt.title('Histograma: Preço dos Terrenos')
+plt.xlabel('Preço do Terreno (R$)')
+
+# Plotando o boxplot do preço dos terrenos
+plt.subplot(2, 1, 2)  # 2 linhas, 1 coluna, segundo gráfico
+sns.boxplot(x=data['Preço do Terreno (R$)'], color='green', linewidth=1.5)  # Boxplot sem preenchimento
+plt.title('Boxplot: Preço dos Terrenos')
+
+# Ajustando o layout
+plt.tight_layout()
+plt.show()
+
 ### Análise dos terrenos
 
 # Passo 3: Análise e Pontuação dos Terrenos
