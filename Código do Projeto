@@ -36,6 +36,24 @@ plt.title('Boxplot: Preço dos Terrenos')
 plt.tight_layout()
 plt.show()
 
+# Identificando outliers no preço dos terrenos
+Q1 = data['Preço do Terreno (R$)'].quantile(0.25)  # Primeiro quartil
+Q3 = data['Preço do Terreno (R$)'].quantile(0.75)  # Terceiro quartil
+IQR = Q3 - Q1  # Intervalo interquartil
+
+# Calculando os limites para identificar outliers
+limite_inferior = Q1 - 1.5 * IQR
+limite_superior = Q3 + 1.5 * IQR
+
+# Filtrando os terrenos que são outliers
+outliers = data[(data['Preço do Terreno (R$)'] < limite_inferior) | 
+                (data['Preço do Terreno (R$)'] > limite_superior)]
+
+# Exibindo os terrenos identificados como outliers
+print("Terrenos identificados como outliers:")
+for index, row in outliers.iterrows():
+    print(f"Índice: {index}, Bairro: {row['Bairro']}, Preço do Terreno: R${row['Preço do Terreno (R$)']:,.2f}")
+
 ### Análise dos terrenos
 
 # Passo 3: Análise e Pontuação dos Terrenos
@@ -86,50 +104,103 @@ for i, terreno in top3_terrenos.iterrows():
     print(f"De Frente para Praia: {'Sim' if terreno['De Frente para Praia'] else 'Não'}")
     print(f"Logística de Pessoas: {terreno['Logística de Pessoas']}")
     print(f"Logística de Veículos: {terreno['Logística de Veículos']}")
-    print(f"Tipo de Solo: {terreno['Tipo de Solo']}\n")
-# Exibir o top 1 terreno
+    print(f"Tipo de Solo: {terreno['Tipo de Solo']}")
+    print(f"Pontuação: {terreno['Pontuação']}\n")
+
+# Ordenar os terrenos pela pontuação em ordem decrescente e pegar o melhor
+melhor_terreno = top_terrenos.head(1)
+
+# Exibir o melhor terreno de forma formatada
 print("Top 1 Terreno:")
-print(melhor_terreno)
+for i, terreno in melhor_terreno.iterrows():
+    print(f"Terreno {i + 1}:")
+    print(f"Bairro: {terreno['Bairro']}")
+    print(f"Preço do Terreno (R$): {terreno['Preço do Terreno (R$)']}")
+    print(f"Preço do Metro Quadrado (R$/m²): {terreno['Preço do Metro Quadrado (R$/m²)']}")
+    print(f"CEP: {terreno['CEP']}")
+    print(f"De Frente para Praia: {'Sim' if terreno['De Frente para Praia'] else 'Não'}")
+    print(f"Logística de Pessoas: {terreno['Logística de Pessoas']}")
+    print(f"Logística de Veículos: {terreno['Logística de Veículos']}")
+    print(f"Tipo de Solo: {terreno['Tipo de Solo']}")
+    print(f"Pontuação: {terreno['Pontuação']}\n")
+
 
 # Passo 5: Modelagem de Valorização do Terreno
-# Definindo a taxa de valorização de 1 ano
-taxa_1_ano = 0.0142  # Taxa de valorização de 1,42% ao ano
+# Passo 5: Modelagem de Valorização do Terreno
 
-# Dados de preço do terreno ao longo do tempo
-anos = np.array([0, 1, 5, 10, 20]).reshape(-1, 1)  # Anos desde a compra
-preco_inicial = melhor_terreno['Preço do Terreno (R$)']
-preco_terreno = np.array([preco_inicial,
-                          preco_inicial * (1 + taxa_1_ano),  # Valorização de 1,42% ao ano
-                          preco_inicial * (1 + taxa_1_ano) ** 5,  # Valorização de 1,42% ao ano por 5 anos
-                          preco_inicial * (1 + taxa_1_ano) ** 10,  # Valorização de 1,42% ao ano por 10 anos
-                          preco_inicial * (1 + taxa_1_ano) ** 20]).reshape(-1, 1)  # Valorização de 1,42% ao ano por 20 anos
+# Definindo a Taxa base de valorização
+taxa_base = 0.0142  # 1,42% ao ano
 
-# Calcular a porcentagem de valorização em relação ao valor inicial
-porcentagem_valorizacao = ((preco_terreno - preco_inicial) / preco_inicial) * 100
+# Adicionar a taxa base de valorização ao DataFrame
+top3_terrenos = top3_terrenos.copy()  # Garantir que é uma cópia
+top3_terrenos['Taxa de Valorizacao'] = taxa_base  # Apenas a taxa base
 
-# Criar e treinar o modelo de regressão linear
+# Selecionar o melhor terreno (primeiro da lista)
+melhor_terreno = top3_terrenos.head(1)
+
+# Obter informações do melhor terreno
+terreno = melhor_terreno.iloc[0]  # Pega o primeiro terreno do DataFrame
+preco_inicial = terreno['Preço do Terreno (R$)']
+taxa_1_ano = terreno['Taxa de Valorizacao']  # Usar apenas a taxa base
+bairro = terreno['Bairro']
+
+# Gerar dados de preço do terreno ao longo do tempo com base na taxa de valorização
+anos = np.array([0, 1, 5, 10, 20]).reshape(-1, 1)
+preco_terreno = preco_inicial * (1 + taxa_1_ano) ** anos.flatten()
+
+# Treinar o modelo de regressão linear
 modelo = LinearRegression()
-modelo.fit(anos, preco_terreno)
+modelo.fit(anos, preco_terreno.reshape(-1, 1))
 
-# Previsão de preço do terreno para os próximos anos
+# Prever os valores futuros
 previsao_anos = np.array([1, 5, 10, 20]).reshape(-1, 1)
 previsao_valorizacao = modelo.predict(previsao_anos)
 
-# Exibir as previsões
-print("Previsão de Valorização do Terreno:")
-for ano, valor, porcentagem in zip([1, 5, 10, 20], previsao_valorizacao, porcentagem_valorizacao):
-    print(f"Em {ano} ano(s): R${valor[0]:,.2f} ({porcentagem[0]:.2f}% de valorização)")
+# Calcular as porcentagens de valorização
+porcentagens = ((previsao_valorizacao.flatten() - preco_inicial) / preco_inicial) * 100
+
+# Exibir as projeções no formato solicitado
+print(f"Melhor Terreno ({bairro}):")
+for ano, preco, porcentagem in zip([1, 5, 10, 20], previsao_valorizacao, porcentagens):
+    print(f"Em {ano} ano(s): R${preco[0]:,.2f} (+{porcentagem:.2f}%)")
 
 ### GRÁFICOS ###
 # Passo 6: Plotando o gráfico
+
+# Supondo que o preço inicial do terreno e a taxa de valorização estejam definidos
+preco_inicial = 500000  # Exemplo de preço inicial do terreno (R$)
+taxa_valorizacao = 0.0142  # Taxa de valorização anual de 1,42%
+
+# Definir os anos para o gráfico
+anos = np.array([0, 1, 5, 10, 20])
+
+# Calcular o preço do terreno ao longo dos anos (valorização)
+preco_terreno = preco_inicial * (1 + taxa_valorizacao) ** anos
+
+# Calcular as porcentagens de valorização para cada ano
+porcentagens = ((preco_terreno - preco_inicial) / preco_inicial) * 100
+
+# Plotando o gráfico de valorização
 plt.figure(figsize=(10, 6))
 plt.plot(anos, preco_terreno, marker='o', linestyle='-', color='b', label='Preço do Terreno')
+
+# Adicionando as porcentagens de valorização ao gráfico
+for i, txt in enumerate(porcentagens):
+    plt.annotate(f'{txt:.2f}%', (anos[i], preco_terreno[i]), textcoords="offset points", xytext=(0, 10), ha='center', fontsize=10, color='red')
+
+# Título e rótulos
 plt.title('Valorização do Terreno ao Longo do Tempo')
 plt.xlabel('Anos desde a Compra')
 plt.ylabel('Preço do Terreno (R$)')
-plt.xticks(np.arange(0, 21, step=1))  # Atualizado para incluir 20 anos
+
+# Ajustando o eixo X para incluir 20 anos
+plt.xticks(np.arange(0, 21, step=1))
+
+# Exibindo a grade e a legenda
 plt.grid(True)
 plt.legend()
+
+# Exibindo o gráfico
 plt.show()
 
 # Passo 6: Visualização dos Resultados
@@ -146,19 +217,24 @@ plt.show()
 
 # Passo 7 Visualizando a localização
 
+# Passo 7 Visualizando a localização
+
 from geopy.geocoders import Nominatim
+import folium
 
 # Lista de CEPs para consultar
-ceps = ['22240-000', '22785-030', '22210-030']
+ceps = ['22210-030', '22785-030', '22041-001']  # Atualizado com o novo terreno do Flamengo
+# Lista com os nomes dos terrenos
+nomes_terrenos = ['Terreno 1 - Flamengo', 'Terreno 2 - Vargem Grande', 'Terreno 3 - Copacabana']
 
 # Criar uma instância do geolocalizador Nominatim
-geolocator = Nominatim(user_agent="geolocalização")
+geolocator = Nominatim(user_agent="geolocalizacao")
 
 # Lista para armazenar as coordenadas
 coordenadas_top3 = []
 
 # Iterar sobre os CEPs e obter as coordenadas
-for cep in ceps:
+for i, cep in enumerate(ceps):
     # Consultar as coordenadas usando o CEP
     location = geolocator.geocode(cep, addressdetails=True)
     
@@ -168,9 +244,24 @@ for cep in ceps:
         latitude = location.latitude
         longitude = location.longitude
         
+        # Se for o CEP 22785-030 (Vargem Grande), substituímos as coordenadas manualmente
+        if cep == '22785-030':
+            latitude = -22.9592653
+            longitude = -43.4844286
+        
         # Adicionar as coordenadas à lista
         coordenadas_top3.append((latitude, longitude))
+# Criar um mapa centrado em uma localização inicial
+mapa = folium.Map(location=[-22.9592653, -43.4844286], zoom_start=10)
 
-# Exibir as coordenadas
+# Adicionar marcadores para cada localização com o nome dos terrenos
 for i, (lat, lon) in enumerate(coordenadas_top3, start=1):
-    print(f"Terreno {i}: Latitude {lat}, Longitude {lon}")
+    nome_terreno = nomes_terrenos[i-1]  # Obter o nome do terreno
+    if i == 2:  # Destacar o terreno vencedor (Vargem Grande)
+        folium.Marker([lat, lon], popup=f"{nome_terreno} - Localização Vencedor", icon=folium.Icon(color='red')).add_to(mapa)
+    else:
+        folium.Marker([lat, lon], popup=nome_terreno).add_to(mapa)
+
+# Exibir o mapa
+mapa
+
